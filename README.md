@@ -161,6 +161,11 @@ non-zero only when nothing was written at all.
 If either store rate-limits you, an HTTP 429 or 5xx is retried up to three times,
 honouring `Retry-After` when present and backing off exponentially when it is not.
 
+### More
+
+The full command line guide, with worked examples for searching, batching,
+resolutions, pacing and scripting, is in [docs/CLI.md](docs/CLI.md).
+
 ### Scripting
 
 ```bash
@@ -196,7 +201,8 @@ Store data is treated as untrusted: filenames are sanitised, icon URLs must be h
 on `play-lh.googleusercontent.com` or `mzstatic.com`, responses have timeouts and size
 ceilings, and anything that does not decode as an image is rejected.
 
-Full detail in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Full detail in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); the command line guide
+is in [docs/CLI.md](docs/CLI.md).
 
 ---
 
