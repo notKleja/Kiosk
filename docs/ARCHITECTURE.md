@@ -142,8 +142,27 @@ aggressively.
 `native/build-cli.sh` compiles `PlayStore.swift`, `IconRenderer.swift` and
 `cli/main.swift` into `build/kiosk`, a plain command line binary with no AppKit UI.
 It reuses the same searching, sanitising and rendering code as the app, so the two
-cannot drift: `search` prints or JSON-dumps results, and `get` writes one PNG using
-the same non-clobbering, atomic write the app uses.
+cannot drift: `search` prints or JSON-dumps results, and `get` writes PNGs using the
+same non-clobbering, atomic write the app uses.
+
+`get` is a bulk tool. It accepts several queries, `--all` to take every result of a
+query rather than the first, and repeated `--pkg` for exact bundle ids; duplicates
+are collapsed by store and bundle id before anything is downloaded. Downloads are
+serialised with a `--delay` pause between them (250 ms by default) so a large batch
+does not hammer either store, and a failure on one icon is reported without
+abandoning the rest — the exit status is non-zero only when nothing was written.
+
+Progress is drawn on stderr as `[done/total]` with a bar, and only when stderr is a
+terminal, so `kiosk get … --json > icons.json` stays machine-readable. In a
+non-interactive run each written path is printed as it lands.
+
+## Rate limits
+
+`PlayStore.data(from:)` retries HTTP 429 and 5xx responses up to three times. A
+`Retry-After` header is honoured in both its forms — a number of seconds or an HTTP
+date — clamped to a minute; without one the delay backs off exponentially (1 s, 2 s,
+4 s). Anything else, including a persistent 429, surfaces as `PlayStoreError.badStatus`
+and reaches the user as a toast in the app or a message on stderr in the CLI.
 
 ## Tests
 

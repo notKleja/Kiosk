@@ -45,11 +45,19 @@ developer uploaded, so asking for 1024 px can legitimately return 512 px unless
 ./native/build-cli.sh
 ./native/build/kiosk search spotify
 ./native/build/kiosk get telegram --store appstore --size 1024 --out ~/Icons
+./native/build/kiosk get spotify whatsapp notion --out ~/Icons
+./native/build/kiosk get "photo editor" --all --limit 10 --delay 500 --out ~/Icons
 ```
 
-`search` lists bundle ids, ratings and names; `get` downloads one icon as PNG,
-picking the first result or the one named with `--pkg`. Both accept `--store`,
-`--country`, `--size`, `--upscale` and `--json`. Run `kiosk --help` for the full list.
+`search` lists bundle ids, ratings and names. `get` takes any number of queries and
+downloads the first match of each, or every result with `--all`, or exact bundle ids
+with repeated `--pkg`. Downloads are paced by `--delay` (250 ms by default) and a
+progress bar is drawn on stderr when the terminal is interactive, so piping stays
+clean. Rate limiting from either store is respected: an HTTP 429 or 5xx is retried up
+to three times, honouring `Retry-After` and otherwise backing off exponentially.
+
+Both commands accept `--store`, `--country`, `--limit`, `--size`, `--upscale` and
+`--json`. Run `kiosk --help` for the full list.
 
 ## Tests
 

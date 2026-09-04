@@ -202,14 +202,41 @@ actor PlayStore {
     }
 
     private func data(from url: URL, maxBytes: Int = 8 * 1024 * 1024) async throws -> Data {
-        let (data, response) = try await session.data(from: url)
-        if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-            throw PlayStoreError.badStatus(http.statusCode)
+        var attempt = 0
+        while true {
+            let (data, response) = try await session.data(from: url)
+            if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+                if Self.retryable.contains(http.statusCode), attempt < 3 {
+                    let wait = Self.retryDelay(http, attempt: attempt)
+                    attempt += 1
+                    try await Task.sleep(for: .seconds(wait))
+                    continue
+                }
+                throw PlayStoreError.badStatus(http.statusCode)
+            }
+            if response.expectedContentLength > Int64(maxBytes) || data.count > maxBytes {
+                throw PlayStoreError.tooLarge
+            }
+            return data
         }
-        if response.expectedContentLength > Int64(maxBytes) || data.count > maxBytes {
-            throw PlayStoreError.tooLarge
+    }
+
+    private static let retryable: Set<Int> = [429, 500, 502, 503, 504]
+
+    private static func retryDelay(_ response: HTTPURLResponse, attempt: Int) -> Double {
+        if let header = response.value(forHTTPHeaderField: "Retry-After") {
+            if let seconds = Double(header.trimmingCharacters(in: .whitespaces)) {
+                return min(max(seconds, 0), 60)
+            }
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = TimeZone(identifier: "GMT")
+            formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+            if let date = formatter.date(from: header) {
+                return min(max(date.timeIntervalSinceNow, 0), 60)
+            }
         }
-        return data
+        return min(pow(2, Double(attempt)), 8)
     }
 
     private func text(from url: URL) async throws -> String {
