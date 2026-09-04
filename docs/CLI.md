@@ -17,6 +17,9 @@ sudo cp native/build/kiosk /usr/local/bin/     # optional: put it on PATH
 kiosk --version
 ```
 
+The copy is a snapshot, not a link: after rebuilding, copy it again or the `kiosk` on
+your `PATH` keeps running the old build. `kiosk --version` is the quickest check.
+
 Every example below assumes `kiosk` is on your `PATH`. If it is not, use
 `./native/build/kiosk` instead.
 

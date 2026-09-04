@@ -34,6 +34,9 @@ To put the CLI on your `PATH`:
 sudo cp native/build/kiosk /usr/local/bin/kiosk
 ```
 
+Reinstall after every `./native/build-cli.sh`, or `kiosk` on your `PATH` stays at the
+old version — `kiosk --version` tells you which one you are running.
+
 ---
 
 ## The app
