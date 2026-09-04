@@ -98,7 +98,9 @@ func parse(_ arguments: [String]) -> (command: String, queries: [String], option
         case "--help", "-h": print(usage()); exit(0)
         default:
             if arg.hasPrefix("-") { fail("unknown option '\(arg)'") }
-            queries.append(arg)
+            queries += arg.split(separator: ",")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
         }
     }
 
