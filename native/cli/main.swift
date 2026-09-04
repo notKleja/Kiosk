@@ -232,6 +232,19 @@ do {
     var failures = 0
     var consecutive = 0
     var pace = options.delay
+    var deferred: [PlayApp] = []
+    var missed: [String] = []
+
+    func download(_ app: PlayApp) async throws -> [String: Any] {
+        let fetchSize = options.fetch ?? options.size
+        let data = try await store.iconData(app, size: fetchSize)
+        let icon = try await IconRenderer.render(
+            data, size: fetchSize, upscale: options.upscale, output: options.outSize)
+        let stem = "\(PlayApp.sanitizedFileName(app.pkg))_\(icon.pixels)"
+        let url = uniqueURL(in: directory, stem: stem)
+        try icon.data.write(to: url, options: .atomic)
+        return ["pkg": app.pkg, "name": app.name, "pixels": icon.pixels, "path": url.path]
+    }
 
     for (index, app) in targets.enumerated() {
         if index > 0, pace > 0 {
@@ -240,18 +253,10 @@ do {
         if interactive { progress(index, targets.count, app.pkg) }
 
         do {
-            let fetchSize = options.fetch ?? options.size
-            let data = try await store.iconData(app, size: fetchSize)
-            let icon = try await IconRenderer.render(
-                data, size: fetchSize, upscale: options.upscale, output: options.outSize)
-            let stem = "\(PlayApp.sanitizedFileName(app.pkg))_\(icon.pixels)"
-            let url = uniqueURL(in: directory, stem: stem)
-            try icon.data.write(to: url, options: .atomic)
-            written.append([
-                "pkg": app.pkg, "name": app.name, "pixels": icon.pixels, "path": url.path,
-            ])
-            if !options.json, !interactive {
-                print(url.path)
+            let row = try await download(app)
+            written.append(row)
+            if !options.json, !interactive, let path = row["path"] as? String {
+                print(path)
             }
             consecutive = 0
         } catch {
@@ -260,11 +265,35 @@ do {
             if case PlayStoreError.rateLimited = error {
                 pace = min(max(pace * 2, 1000), 10_000)
                 note("\rkiosk: rate limited, slowing to \(pace)ms")
+                deferred.append(app)
+            } else {
+                missed.append(app.pkg)
             }
             note("\rkiosk: \(app.pkg): \(error.localizedDescription)")
             if consecutive >= 8 {
-                note("kiosk: giving up after 8 consecutive failures")
+                note("kiosk: pausing after 8 consecutive failures")
+                deferred.append(contentsOf: targets[(index + 1)...])
                 break
+            }
+        }
+    }
+
+    if !deferred.isEmpty {
+        let wait = max(pace * 4, 3000)
+        note("\rkiosk: retrying \(deferred.count) skipped in \(wait / 1000)s")
+        try await Task.sleep(for: .milliseconds(wait))
+        for (index, app) in deferred.enumerated() {
+            if index > 0, pace > 0 { try await Task.sleep(for: .milliseconds(pace)) }
+            if interactive { progress(index, deferred.count, "retry \(app.pkg)") }
+            do {
+                let row = try await download(app)
+                written.append(row)
+                if !options.json, !interactive, let path = row["path"] as? String {
+                    print(path)
+                }
+            } catch {
+                missed.append(app.pkg)
+                note("\rkiosk: \(app.pkg): \(error.localizedDescription)")
             }
         }
     }
@@ -287,6 +316,10 @@ do {
         let data = try JSONSerialization.data(
             withJSONObject: written, options: [.prettyPrinted, .sortedKeys])
         print(String(decoding: data, as: UTF8.self))
+    }
+
+    if !missed.isEmpty {
+        note("kiosk: \(missed.count) not downloaded: \(missed.joined(separator: " "))")
     }
 
     exit(failures > 0 && written.isEmpty ? 1 : 0)

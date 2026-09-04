@@ -220,10 +220,18 @@ otherwise backing off exponentially with jitter. A persistent 429 then makes `ki
 double its own pacing for the rest of the run, to a minimum of 1 s and a maximum of
 10 s, and say so on stderr.
 
-Individual failures never abort a batch: they are reported on stderr and the run
-carries on. Eight consecutive failures do stop it, so a batch cannot hammer a store
-that is refusing everything. The exit status is non-zero only if nothing at all was
-written.
+Nothing is silently dropped. An icon skipped because of a 429 goes back on a queue and
+is retried once at the end of the run, after a longer pause; eight consecutive failures
+stop the main pass and push everything still outstanding onto that same queue rather
+than abandoning it. Whatever is still missing afterwards is listed by bundle id on
+stderr:
+
+```
+kiosk: 2 not downloaded: com.example.one com.example.two
+```
+
+Other failures are reported as they happen and the run carries on. The exit status is
+non-zero only if nothing at all was written.
 
 ---
 
