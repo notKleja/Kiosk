@@ -212,7 +212,7 @@ do {
         if index > 0, options.delay > 0 {
             try await Task.sleep(for: .milliseconds(options.delay))
         }
-        if interactive, !options.json { progress(index, targets.count, app.pkg) }
+        if interactive { progress(index, targets.count, app.pkg) }
 
         do {
             let fetchSize = options.fetch ?? options.size
@@ -234,9 +234,12 @@ do {
         }
     }
 
-    if interactive, !options.json {
+    if interactive {
         progress(targets.count, targets.count, "done")
         note("")
+    }
+
+    if interactive, !options.json {
         for row in written {
             let pixels = row["pixels"] as? Int ?? 0
             let requested = options.outSize ?? options.fetch ?? options.size
