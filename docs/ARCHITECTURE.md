@@ -48,6 +48,33 @@ the most likely thing to need fixing later. Google's old suggestion endpoint
 (`market.android.com/suggest`) is gone, which is why suggestions come from running the
 search itself rather than a cheaper autocomplete call.
 
+## Input handling
+
+Everything that comes back from either store is untrusted input: bundle ids, app
+names and artwork URLs are all attacker-influenceable and are treated accordingly.
+
+Filenames — for saved icons and for the clipboard's temporary file — go through a
+sanitiser that keeps only `[A-Za-z0-9._-]`, replaces anything else with `-`, strips
+leading dots and caps the result at 80 characters, falling back to `icon` if nothing
+usable is left. This means a package literally named `..` cannot escape the chosen
+save folder.
+
+Icon URLs must be `https` and resolve to `play-lh.googleusercontent.com` or
+`mzstatic.com`; anything else is rejected rather than fetched, and a malformed
+artwork URL now throws instead of force-unwrapping.
+
+Network requests carry timeouts (15 s to connect, 30 s per resource) and byte
+ceilings — 8 MB for images, 20 MB for search HTML — so an oversized or stalled
+response is rejected rather than read to completion. Bytes that fail to decode as
+an image are rejected too, instead of being written out with a `.png` extension
+regardless.
+
+Icon decode, upscale and encode run off the main actor, so a large or slow image
+does not block the interface.
+
+Saves are atomic and never overwrite an existing file: a name already in use gets
+" 2", " 3", and so on appended.
+
 ## Typing, debouncing and stale results
 
 `IconModel.query` schedules a search on every change. The pending task is cancelled,
@@ -94,5 +121,7 @@ Sizes are rendered with `Text(verbatim:)` so `1024px` is not localised into `1,0
 `native/build.sh` writes `Info.plist` (bundle id `com.kleja.kiosk`, minimum system
 version 26.0), compiles all sources with `swiftc -O -parse-as-library` targeting
 `arm64-apple-macos26.0`, copies `native/Resources/AppIcon.icns` in and ad-hoc signs the
-bundle. Rebuilding after an icon change may need `lsregister -f` and `killall Dock`,
-since macOS caches icons aggressively.
+bundle. Codesign failures are no longer suppressed, so `set -e` stops the script if
+signing fails rather than silently producing an unsigned app. Rebuilding after an
+icon change may need `lsregister -f` and `killall Dock`, since macOS caches icons
+aggressively.

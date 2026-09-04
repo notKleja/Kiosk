@@ -96,6 +96,15 @@ struct ContentView: View {
                     .pickerStyle(.inline)
                 }
 
+                menu(model.upscale ? "Upscale" : "Max size") {
+                    Picker("", selection: $model.upscale) {
+                        Text(verbatim: "Max size").tag(false)
+                        Text(verbatim: "Upscale").tag(true)
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.inline)
+                }
+
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 14)
@@ -121,8 +130,10 @@ struct ContentView: View {
                         AppRow(app: app, size: model.size) {
                             Task {
                                 do {
-                                    try await model.copy(app)
-                                    show("Copied \(app.name)")
+                                    let pixels = try await model.copy(app)
+                                    show(pixels < model.size
+                                        ? "Copied \(app.name) — only \(pixels)px available"
+                                        : "Copied \(app.name) at \(pixels)px")
                                 } catch { show("Copy failed") }
                             }
                         } save: {
@@ -245,10 +256,12 @@ struct AppRow: View {
                     .controlSize(.small)
                     .help("Copy icon to clipboard")
 
-                    Button("\(size)px", action: save)
-                        .buttonStyle(.glass)
-                        .controlSize(.small)
-                        .help("Save PNG")
+                    Button(action: save) {
+                        Image(systemName: "arrow.down.circle")
+                    }
+                    .buttonStyle(.glass)
+                    .controlSize(.small)
+                    .help("Save \(size)px PNG")
                 }
             }
         }

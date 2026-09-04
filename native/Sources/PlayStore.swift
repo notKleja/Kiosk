@@ -18,11 +18,46 @@ struct PlayApp: Identifiable, Hashable {
 
     var id: String { "\(source.rawValue)|\(pkg)" }
 
-    func sized(_ size: Int) -> URL {
+    func sized(_ size: Int) -> URL? {
+        let string: String
         switch source {
-        case .play: URL(string: "\(icon)=s\(size)-rw")!
-        case .appStore: URL(string: "\(icon)/\(size)x\(size)bb.png")!
+        case .play: string = "\(icon)=s\(size)-rw"
+        case .appStore: string = "\(icon)/\(size)x\(size)bb.png"
         }
+        guard let url = URL(string: string), Self.isAllowedIconHost(url) else { return nil }
+        return url
+    }
+
+    static func isAllowedIconHost(_ url: URL) -> Bool {
+        guard url.scheme == "https", let host = url.host else { return false }
+        let allowedSuffixes = ["play-lh.googleusercontent.com", "mzstatic.com"]
+        return allowedSuffixes.contains { host == $0 || host.hasSuffix(".\($0)") }
+    }
+
+    static func sanitizedFileName(_ raw: String) -> String {
+        let allowed = CharacterSet(
+            charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._-")
+        var result = ""
+        result.reserveCapacity(raw.count)
+        for scalar in raw.unicodeScalars {
+            result.unicodeScalars.append(allowed.contains(scalar) ? scalar : "-")
+        }
+        while result.contains("--") {
+            result = result.replacingOccurrences(of: "--", with: "-")
+        }
+        while let first = result.first, first == "." || first == "-" {
+            result.removeFirst()
+        }
+        while let last = result.last, last == "-" {
+            result.removeLast()
+        }
+        if result.count > 80 {
+            result = String(result.prefix(80))
+            while let last = result.last, last == "-" {
+                result.removeLast()
+            }
+        }
+        return result.isEmpty ? "icon" : result
     }
 }
 
@@ -41,10 +76,14 @@ private struct ITunesResponse: Decodable {
 
 enum PlayStoreError: Error, LocalizedError {
     case badStatus(Int)
+    case badIconURL
+    case tooLarge
 
     var errorDescription: String? {
         switch self {
         case .badStatus(let code): return "Play Store returned HTTP \(code)"
+        case .badIconURL: return "Icon URL is invalid or not from a trusted host"
+        case .tooLarge: return "Response exceeded the maximum allowed size"
         }
     }
 }
@@ -57,6 +96,10 @@ actor PlayStore {
                 + "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36",
             "Accept-Language": "en-US,en",
         ]
+        config.timeoutIntervalForRequest = 15
+        config.timeoutIntervalForResource = 30
+        config.httpShouldSetCookies = false
+        config.urlCache = nil
         return URLSession(configuration: config)
     }()
 
@@ -96,6 +139,7 @@ actor PlayStore {
 
         return response.results.compactMap { result in
             guard let art = result.artworkUrl512 ?? result.artworkUrl100,
+                  let artURL = URL(string: art), PlayApp.isAllowedIconHost(artURL),
                   let base = art.range(of: "/", options: .backwards).map({ String(art[..<$0.lowerBound]) })
             else { return nil }
             let rating = result.averageUserRating.map { String(format: "%.1f", $0) } ?? ""
@@ -153,19 +197,23 @@ actor PlayStore {
     }
 
     func iconData(_ app: PlayApp, size: Int) async throws -> Data {
-        try await data(from: app.sized(size))
+        guard let url = app.sized(size) else { throw PlayStoreError.badIconURL }
+        return try await data(from: url)
     }
 
-    private func data(from url: URL) async throws -> Data {
+    private func data(from url: URL, maxBytes: Int = 8 * 1024 * 1024) async throws -> Data {
         let (data, response) = try await session.data(from: url)
         if let http = response as? HTTPURLResponse, http.statusCode != 200 {
             throw PlayStoreError.badStatus(http.statusCode)
+        }
+        if response.expectedContentLength > Int64(maxBytes) || data.count > maxBytes {
+            throw PlayStoreError.tooLarge
         }
         return data
     }
 
     private func text(from url: URL) async throws -> String {
-        let data = try await data(from: url)
+        let data = try await data(from: url, maxBytes: 20 * 1024 * 1024)
         return String(decoding: data, as: UTF8.self)
     }
 

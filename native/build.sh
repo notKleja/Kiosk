@@ -35,5 +35,5 @@ if [ -f Resources/AppIcon.icns ]; then
 	cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 fi
 
-codesign --force --sign - "$APP" >/dev/null 2>&1 || true
+codesign --force --sign - --options runtime --timestamp=none "$APP"
 echo "built $APP"
