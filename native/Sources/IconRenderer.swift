@@ -17,9 +17,15 @@ enum IconError: Error, LocalizedError {
 }
 
 nonisolated enum IconRenderer {
-    static func render(_ data: Data, size: Int, upscale: Bool) async throws -> RenderedIcon {
+    static func render(
+        _ data: Data, size: Int, upscale: Bool, output: Int? = nil
+    ) async throws -> RenderedIcon {
         guard let image = NSBitmapImageRep(data: data) else {
             throw IconError.notAnImage
+        }
+        if let output, output != image.pixelsWide {
+            guard let scaled = resize(image, to: output) else { throw IconError.notAnImage }
+            return RenderedIcon(data: scaled, pixels: output)
         }
         if upscale, image.pixelsWide < size, let scaled = resize(image, to: size) {
             return RenderedIcon(data: scaled, pixels: size)

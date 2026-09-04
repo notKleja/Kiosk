@@ -116,6 +116,8 @@ kiosk get telegram --store appstore --size 1024 --out ~/Icons
 | `--country <cc>` | `us` | Storefront, e.g. `us`, `sa`, `gb` |
 | `--limit <n>` | `20` | Results per search (1–50); with `--all`, how many get downloaded |
 | `--size <px>` | `512` | Requested icon size, 16–4096 |
+| `--fetch <px>` | `--size` | Size asked of the store, before any resampling |
+| `--out-size <px>` | — | Exact size of the written PNG, resampled from what arrived |
 | `--pkg <id>` | — | Download this exact bundle id. Repeatable |
 | `--all` | off | Download every result of each query, not just the first |
 | `--delay <ms>` | `250` | Pause between downloads. `0` disables it |
@@ -132,6 +134,13 @@ to the requested size instead; the CLI notes the cap either way:
 
 ```
 ~/Icons/com.snapchat.android_512.png  (store max 512px)
+```
+
+`--fetch` and `--out-size` split the two resolutions apart when you want the sharpest
+possible small icon: fetch the largest master the store has, then resample down.
+
+```bash
+kiosk get notion --fetch 1024 --out-size 128 --out ~/Icons   # notion.id_128.png
 ```
 
 Nothing is ever overwritten: an existing name gets ` 2`, ` 3`, and so on.

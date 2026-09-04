@@ -1,12 +1,14 @@
 import Foundation
 
-let version = "1.2.0"
+let version = "1.3.0"
 
 struct Options {
     var store: StoreSource = .play
     var country = "us"
     var limit = 20
     var size = 512
+    var fetch: Int?
+    var outSize: Int?
     var upscale = false
     var json = false
     var all = false
@@ -29,6 +31,8 @@ func usage() -> String {
       --country <cc>            storefront, e.g. us, sa (default us)
       --limit <n>               results per search (default 20)
       --size <px>               icon size for get: 128, 256, 512, 1024 (default 512)
+      --fetch <px>              size requested from the store (default: --size)
+      --out-size <px>           final PNG size, resampled from what arrived
       --pkg <id>                download this exact bundle id; repeatable
       --all                     download every result of each query, not just the first
       --delay <ms>              pause between downloads (default 250, 0 to disable)
@@ -42,6 +46,7 @@ func usage() -> String {
       kiosk get spotify whatsapp notion --size 512 --out ~/Icons
       kiosk get "photo editor" --all --limit 10 --delay 500 --out ~/Icons
       kiosk get --pkg com.spotify.music --pkg com.snapchat.android --size 512
+      kiosk get notion --fetch 1024 --out-size 128 --out ~/Icons
     """
 }
 
@@ -87,6 +92,12 @@ func parse(_ arguments: [String]) -> (command: String, queries: [String], option
         case "--size":
             guard let n = Int(value("--size")), n >= 16, n <= 4096 else { fail("--size must be 16-4096") }
             options.size = n
+        case "--fetch":
+            guard let n = Int(value("--fetch")), n >= 16, n <= 4096 else { fail("--fetch must be 16-4096") }
+            options.fetch = n
+        case "--out-size":
+            guard let n = Int(value("--out-size")), n >= 16, n <= 4096 else { fail("--out-size must be 16-4096") }
+            options.outSize = n
         case "--delay":
             guard let n = Int(value("--delay")), n >= 0, n <= 60_000 else { fail("--delay must be 0-60000") }
             options.delay = n
@@ -204,9 +215,10 @@ do {
         if interactive, !options.json { progress(index, targets.count, app.pkg) }
 
         do {
-            let data = try await store.iconData(app, size: options.size)
+            let fetchSize = options.fetch ?? options.size
+            let data = try await store.iconData(app, size: fetchSize)
             let icon = try await IconRenderer.render(
-                data, size: options.size, upscale: options.upscale)
+                data, size: fetchSize, upscale: options.upscale, output: options.outSize)
             let stem = "\(PlayApp.sanitizedFileName(app.pkg))_\(icon.pixels)"
             let url = uniqueURL(in: directory, stem: stem)
             try icon.data.write(to: url, options: .atomic)
@@ -227,7 +239,8 @@ do {
         note("")
         for row in written {
             let pixels = row["pixels"] as? Int ?? 0
-            let short = pixels < options.size && !options.upscale ? "  (store max \(pixels)px)" : ""
+            let requested = options.outSize ?? options.fetch ?? options.size
+            let short = pixels < requested && !options.upscale ? "  (store max \(pixels)px)" : ""
             print("\(row["path"] as? String ?? "")\(short)")
         }
     }
