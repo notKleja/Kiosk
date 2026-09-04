@@ -83,7 +83,7 @@ enum PlayStoreError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .badStatus(let code): return "Store returned HTTP \(code)"
-        case .rateLimited: return "Rate limited by the store; try again with a longer --delay"
+        case .rateLimited: return "Rate limited by the store — wait a moment and try again"
         case .badIconURL: return "Icon URL is invalid or not from a trusted host"
         case .tooLarge: return "Response exceeded the maximum allowed size"
         }
