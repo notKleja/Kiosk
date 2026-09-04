@@ -76,12 +76,14 @@ private struct ITunesResponse: Decodable {
 
 enum PlayStoreError: Error, LocalizedError {
     case badStatus(Int)
+    case rateLimited
     case badIconURL
     case tooLarge
 
     var errorDescription: String? {
         switch self {
-        case .badStatus(let code): return "Play Store returned HTTP \(code)"
+        case .badStatus(let code): return "Store returned HTTP \(code)"
+        case .rateLimited: return "Rate limited by the store; try again with a longer --delay"
         case .badIconURL: return "Icon URL is invalid or not from a trusted host"
         case .tooLarge: return "Response exceeded the maximum allowed size"
         }
@@ -212,6 +214,7 @@ actor PlayStore {
                     try await Task.sleep(for: .seconds(wait))
                     continue
                 }
+                if http.statusCode == 429 { throw PlayStoreError.rateLimited }
                 throw PlayStoreError.badStatus(http.statusCode)
             }
             if response.expectedContentLength > Int64(maxBytes) || data.count > maxBytes {
@@ -221,9 +224,9 @@ actor PlayStore {
         }
     }
 
-    private static let retryable: Set<Int> = [429, 500, 502, 503, 504]
+    static let retryable: Set<Int> = [429, 500, 502, 503, 504]
 
-    private static func retryDelay(_ response: HTTPURLResponse, attempt: Int) -> Double {
+    static func retryDelay(_ response: HTTPURLResponse, attempt: Int) -> Double {
         if let header = response.value(forHTTPHeaderField: "Retry-After") {
             if let seconds = Double(header.trimmingCharacters(in: .whitespaces)) {
                 return min(max(seconds, 0), 60)
@@ -236,7 +239,7 @@ actor PlayStore {
                 return min(max(date.timeIntervalSinceNow, 0), 60)
             }
         }
-        return min(pow(2, Double(attempt)), 8)
+        return min(pow(2, Double(attempt)), 8) + Double.random(in: 0...0.4)
     }
 
     private func text(from url: URL) async throws -> String {

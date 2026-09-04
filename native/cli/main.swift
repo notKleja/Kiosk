@@ -176,6 +176,7 @@ do {
 
     var targets: [PlayApp] = []
     var seen = Set<String>()
+    var searchFailures = 0
 
     for (index, query) in queries.enumerated() {
         if index > 0, options.delay > 0 {
@@ -187,9 +188,14 @@ do {
             apps = try await store.search(
                 query, source: options.store, country: options.country, limit: options.limit)
         } catch {
+            searchFailures += 1
             note("\rkiosk: '\(query)': \(error.localizedDescription)")
+            if searchFailures >= 8 {
+                fail("giving up after 8 consecutive search failures")
+            }
             continue
         }
+        searchFailures = 0
         guard !apps.isEmpty else {
             note("kiosk: no results for '\(query)'")
             continue
@@ -224,10 +230,12 @@ do {
 
     var written: [[String: Any]] = []
     var failures = 0
+    var consecutive = 0
+    var pace = options.delay
 
     for (index, app) in targets.enumerated() {
-        if index > 0, options.delay > 0 {
-            try await Task.sleep(for: .milliseconds(options.delay))
+        if index > 0, pace > 0 {
+            try await Task.sleep(for: .milliseconds(pace))
         }
         if interactive { progress(index, targets.count, app.pkg) }
 
@@ -245,9 +253,19 @@ do {
             if !options.json, !interactive {
                 print(url.path)
             }
+            consecutive = 0
         } catch {
             failures += 1
+            consecutive += 1
+            if case PlayStoreError.rateLimited = error {
+                pace = min(max(pace * 2, 1000), 10_000)
+                note("\rkiosk: rate limited, slowing to \(pace)ms")
+            }
             note("\rkiosk: \(app.pkg): \(error.localizedDescription)")
+            if consecutive >= 8 {
+                note("kiosk: giving up after 8 consecutive failures")
+                break
+            }
         }
     }
 

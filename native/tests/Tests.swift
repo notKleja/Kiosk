@@ -99,6 +99,41 @@ struct Tests {
         check("sized returns nil for disallowed host",
             disallowedHostApp.sized(512) == nil)
 
+        func response(_ code: Int, retryAfter: String?) -> HTTPURLResponse {
+            var headers: [String: String] = [:]
+            if let retryAfter { headers["Retry-After"] = retryAfter }
+            return HTTPURLResponse(
+                url: URL(string: "https://play.google.com/")!, statusCode: code,
+                httpVersion: nil, headerFields: headers)!
+        }
+
+        check("429 is retryable", PlayStore.retryable.contains(429))
+        check("503 is retryable", PlayStore.retryable.contains(503))
+        check("404 is not retryable", !PlayStore.retryable.contains(404))
+
+        let numeric = PlayStore.retryDelay(response(429, retryAfter: "3"), attempt: 0)
+        check("Retry-After seconds honoured", numeric == 3, "\(numeric)")
+
+        let clamped = PlayStore.retryDelay(response(429, retryAfter: "9999"), attempt: 0)
+        check("Retry-After clamped to a minute", clamped == 60, "\(clamped)")
+
+        let negative = PlayStore.retryDelay(response(429, retryAfter: "-5"), attempt: 0)
+        check("negative Retry-After floors at zero", negative == 0, "\(negative)")
+
+        let httpDate = PlayStore.retryDelay(
+            response(503, retryAfter: "Wed, 21 Oct 2015 07:28:00 GMT"), attempt: 0)
+        check("past HTTP date yields no wait", httpDate == 0, "\(httpDate)")
+
+        let garbage = PlayStore.retryDelay(response(429, retryAfter: "soon"), attempt: 1)
+        check("garbage Retry-After backs off", garbage >= 2 && garbage <= 2.4, "\(garbage)")
+
+        let backoff0 = PlayStore.retryDelay(response(500, retryAfter: nil), attempt: 0)
+        let backoff2 = PlayStore.retryDelay(response(500, retryAfter: nil), attempt: 2)
+        check("backoff grows with attempts", backoff0 < backoff2, "\(backoff0) \(backoff2)")
+
+        let capped = PlayStore.retryDelay(response(500, retryAfter: nil), attempt: 9)
+        check("backoff capped at eight seconds", capped <= 8.4, "\(capped)")
+
         print("\(total - failures)/\(total) passed")
         if failures > 0 {
             exit(1)

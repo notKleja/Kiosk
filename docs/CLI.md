@@ -211,10 +211,19 @@ kiosk get "wallpaper" --all --limit 30 --delay 750 --out ~/Icons   # gentle
 kiosk get whatsapp snapchat --delay 0 --out ~/Icons                # no pause
 ```
 
+`--delay` also paces the searches themselves, not just the icon downloads, since a
+long batch does one search per name.
+
 If a store rate-limits you anyway, an HTTP 429 or 5xx is retried up to three times,
-honouring `Retry-After` when the server sends one and backing off exponentially
-otherwise. A single icon that still fails is reported on stderr and the batch carries
-on; the exit status is non-zero only if nothing at all was written.
+honouring `Retry-After` — as seconds or as an HTTP date, clamped to a minute — and
+otherwise backing off exponentially with jitter. A persistent 429 then makes `kiosk`
+double its own pacing for the rest of the run, to a minimum of 1 s and a maximum of
+10 s, and say so on stderr.
+
+Individual failures never abort a batch: they are reported on stderr and the run
+carries on. Eight consecutive failures do stop it, so a batch cannot hammer a store
+that is refusing everything. The exit status is non-zero only if nothing at all was
+written.
 
 ---
 

@@ -159,7 +159,9 @@ failed icon is reported on stderr and the batch continues; the exit status is
 non-zero only when nothing was written at all.
 
 If either store rate-limits you, an HTTP 429 or 5xx is retried up to three times,
-honouring `Retry-After` when present and backing off exponentially when it is not.
+honouring `Retry-After` and otherwise backing off exponentially with jitter. A
+persistent 429 doubles the run's own pacing, and eight consecutive failures stop the
+batch rather than hammering the store.
 
 ### More
 
@@ -185,8 +187,9 @@ jq -r '.[] | "\(.pkg) \(.pixels)px -> \(.path)"' written.json
 ./native/tests/run.sh
 ```
 
-Eighteen offline assertions covering the filename sanitiser, the icon-host allow-list
-and URL construction. No network access, no XCTest, no SwiftPM.
+Twenty-eight offline assertions covering the filename sanitiser, the icon-host
+allow-list, URL construction and the `Retry-After` / backoff logic. No network access,
+no XCTest, no SwiftPM.
 
 ---
 
