@@ -2,11 +2,10 @@
 
 A small native macOS app for grabbing app icons. Search the Google Play Store or
 the Apple App Store by app name, see results update as you type, then copy an icon
-to the clipboard or save it as a PNG at 128–1024 px.
+to the clipboard or save it as a PNG at 128–1024 px. A `kiosk` command line tool
+does the same thing without the window.
 
 Built with SwiftUI and macOS 26's Liquid Glass, with no third-party dependencies.
-
-![size](https://img.shields.io/badge/bundle-644%20KB-brightgreen)
 
 ## Requirements
 
@@ -20,19 +19,25 @@ Built with SwiftUI and macOS 26's Liquid Glass, with no third-party dependencies
 open "native/build/Kiosk.app"
 ```
 
-The script compiles `native/Sources/*.swift` with `swiftc`, assembles an `.app`
+The script compiles `native/Sources/*.swift` with `swiftc`, assembles a ~2 MB `.app`
 bundle, copies in the icon and ad-hoc signs it. There is no Xcode project to open.
+Prebuilt bundles are attached to each [release](https://github.com/notKleja/Kiosk/releases);
+because they are ad-hoc signed, the first launch needs right-click → Open.
 
 ## Using it
 
 1. Type at least two characters — results refresh 250 ms after you stop typing.
-2. Pick the store (Google Play or App Store), the icon size, and the storefront
-   country. All three are remembered between launches.
-3. On any row, the copy button puts the icon on the clipboard, and the size button
-   writes a PNG into the save folder shown at the bottom. Use **Change** to pick a
-   different folder.
+2. Pick the store, the icon size, the storefront country, and whether an icon smaller
+   than the requested size should be upscaled (**Upscale**) or left at the store's
+   maximum (**Max size**). All four are remembered between launches.
+3. On any row, the copy button puts the icon on the clipboard and the download button
+   writes a PNG into the folder shown at the bottom. Use **Change** to pick another.
 
-Icons land as `<bundle id>_<size>.png`, for example `com.spotify.music_512.png`.
+Icons land as `<bundle id>_<pixels>.png` — for example `com.spotify.music_512.png` —
+where `<pixels>` is the size actually delivered. Stores cap each icon at the size its
+developer uploaded, so asking for 1024 px can legitimately return 512 px unless
+**Upscale** is on. An existing file is never overwritten; the next one gets ` 2`,
+` 3`, and so on.
 
 ## Command line
 
@@ -42,15 +47,24 @@ Icons land as `<bundle id>_<size>.png`, for example `com.spotify.music_512.png`.
 ./native/build/kiosk get telegram --store appstore --size 1024 --out ~/Icons
 ```
 
-`search` lists bundle ids, ratings and names (`--json` for machine-readable output);
-`get` downloads one icon as PNG, picking the first result or the one named with
-`--pkg`. Both accept `--store`, `--country`, `--size` and `--upscale`. Run
-`kiosk --help` for the full list.
+`search` lists bundle ids, ratings and names; `get` downloads one icon as PNG,
+picking the first result or the one named with `--pkg`. Both accept `--store`,
+`--country`, `--size`, `--upscale` and `--json`. Run `kiosk --help` for the full list.
+
+## Tests
+
+```bash
+./native/tests/run.sh
+```
+
+Eighteen offline assertions covering the filename sanitiser, the icon-host allow-list
+and URL construction. No network access required.
 
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md) — how search, icon fetching, clipboard and
-  saving work, and what breaks when the stores change.
+  saving work, how untrusted store data is handled, and what breaks when the stores
+  change their markup.
 
 ## Licence
 

@@ -1,6 +1,6 @@
 # Architecture
 
-Three Swift files, no dependencies.
+Four Swift sources plus a command line entry point, no dependencies.
 
 | File | Role |
 | --- | --- |
@@ -22,8 +22,10 @@ case .appStore: "\(icon)/\(size)x\(size)bb.png" // …mzstatic.com/…/512x512bb
 ```
 
 This is the whole trick behind the app: both stores serve their icons from an image
-CDN that resizes on demand, so any size up to 1024 px is a URL away and nothing has
-to be upscaled locally.
+CDN that resizes on demand, so any size is a URL away. The CDN will not invent detail,
+though — it caps each icon at the master the developer uploaded, so a request for
+1024 px can come back as 512 px. The app reports the size it actually received, and
+`IconRenderer` only interpolates up to the requested size when **Upscale** is on.
 
 ## Searching
 
@@ -89,10 +91,12 @@ request from overwriting the results of a later one.
 
 ## Clipboard
 
-Copying converts the downloaded artwork to PNG through `NSBitmapImageRep`, then writes
+Copying renders the downloaded artwork to PNG off the main actor, then writes
 three flavours to `NSPasteboard` so different apps can each take what they understand:
 
-- a file URL in the temporary directory, named `<App Name> <size>px.png`
+- a file URL named `<App Name> <pixels>px.png`, written into a per-run subdirectory
+  of the temporary directory so repeated copies never collide, with the name passed
+  through the same sanitiser used for saving
 - an `NSPasteboardItem` carrying the PNG data and the app name as text
 - an `NSImage`
 
@@ -101,12 +105,14 @@ image; plain text fields get the name.
 
 ## Saving and preferences
 
-Saving writes `<bundle id>_<size>.png` into the chosen folder, creating it if needed.
-The folder is picked with `NSOpenPanel`. The app is not sandboxed, so a chosen folder
-keeps working after a restart without security-scoped bookmarks.
+Saving writes `<bundle id>_<pixels>.png` into the chosen folder, creating it if
+needed, where `<pixels>` is the size actually delivered rather than the size asked
+for. Writes are atomic and never clobber: an existing name gets " 2", " 3", and so
+on. The folder is picked with `NSOpenPanel`. The app is not sandboxed, so a chosen
+folder keeps working after a restart without security-scoped bookmarks.
 
-Store, size, country and save folder are persisted in `UserDefaults` under the
-`com.kleja.kiosk` domain and restored in `IconModel.init`.
+Store, size, country, the upscale flag and the save folder are persisted in
+`UserDefaults` under the `com.kleja.kiosk` domain and restored in `IconModel.init`.
 
 ## Interface
 
@@ -117,6 +123,9 @@ triggers. The dropdowns are `Menu` with `.menuStyle(.button)`, which is what let
 trigger itself be glass — a plain `Picker` renders as a standard bordered control.
 
 Sizes are rendered with `Text(verbatim:)` so `1024px` is not localised into `1,024px`.
+The store, size, country and upscale controls are all the same `Menu` built by one
+helper, so they stay visually identical. **About Kiosk** is replaced with a panel
+showing the version from `Info.plist`.
 
 ## Build
 
@@ -135,3 +144,13 @@ aggressively.
 It reuses the same searching, sanitising and rendering code as the app, so the two
 cannot drift: `search` prints or JSON-dumps results, and `get` writes one PNG using
 the same non-clobbering, atomic write the app uses.
+
+## Tests
+
+`native/tests/run.sh` compiles `PlayStore.swift` together with `tests/Tests.swift`
+into a throwaway binary — deliberately excluding `App.swift` and `ContentView.swift`,
+whose `@main` would clash — runs it, and cleans up. The eighteen assertions are pure
+and offline: sanitiser behaviour (`..`, slashes, empty input, the 80-character cap,
+unicode), the host allow-list including a `…googleusercontent.com.evil.com` lookalike,
+and `sized` returning `nil` for malformed or disallowed URLs. There is no XCTest or
+SwiftPM dependency.
