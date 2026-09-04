@@ -177,9 +177,19 @@ do {
     var targets: [PlayApp] = []
     var seen = Set<String>()
 
-    for query in queries {
-        let apps = try await store.search(
-            query, source: options.store, country: options.country, limit: options.limit)
+    for (index, query) in queries.enumerated() {
+        if index > 0, options.delay > 0 {
+            try await Task.sleep(for: .milliseconds(options.delay))
+        }
+        if interactive { progress(index, queries.count, "searching \(query)") }
+        let apps: [PlayApp]
+        do {
+            apps = try await store.search(
+                query, source: options.store, country: options.country, limit: options.limit)
+        } catch {
+            note("\rkiosk: '\(query)': \(error.localizedDescription)")
+            continue
+        }
         guard !apps.isEmpty else {
             note("kiosk: no results for '\(query)'")
             continue
@@ -191,8 +201,15 @@ do {
 
     for pkg in options.packages {
         if targets.contains(where: { $0.pkg == pkg }) { continue }
-        let apps = try await store.search(
-            pkg, source: options.store, country: options.country, limit: options.limit)
+        if options.delay > 0 { try await Task.sleep(for: .milliseconds(options.delay)) }
+        let apps: [PlayApp]
+        do {
+            apps = try await store.search(
+                pkg, source: options.store, country: options.country, limit: options.limit)
+        } catch {
+            note("kiosk: '\(pkg)': \(error.localizedDescription)")
+            continue
+        }
         guard let match = apps.first(where: { $0.pkg == pkg }) else {
             note("kiosk: no app with bundle id '\(pkg)'")
             continue
