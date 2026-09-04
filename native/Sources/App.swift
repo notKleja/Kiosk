@@ -10,6 +10,27 @@ struct KioskApp: App {
                 .frame(minWidth: 420, idealWidth: 460, minHeight: 440, idealHeight: 600)
         }
         .windowStyle(.hiddenTitleBar)
+        .commands {
+            CommandGroup(replacing: .appInfo) {
+                Button("About Kiosk") { showAbout() }
+            }
+        }
+    }
+
+    private func showAbout() {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.orderFrontStandardAboutPanel(options: [
+            .applicationName: "Kiosk",
+            .applicationVersion: version,
+            .version: "build \(build)",
+            .credits: NSAttributedString(
+                string: "App icons from Google Play and the App Store.\n"
+                    + "github.com/notKleja/Kiosk",
+                attributes: [.font: NSFont.systemFont(ofSize: 11)]),
+        ])
     }
 }
 
