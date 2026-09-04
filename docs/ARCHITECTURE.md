@@ -6,7 +6,9 @@ Three Swift files, no dependencies.
 | --- | --- |
 | `native/Sources/PlayStore.swift` | Talks to both stores and returns `PlayApp` values |
 | `native/Sources/App.swift` | `IconModel`: state, debouncing, clipboard, saving, preferences |
+| `native/Sources/IconRenderer.swift` | Decode, optional upscale and PNG encoding, off the main actor |
 | `native/Sources/ContentView.swift` | SwiftUI interface built on Liquid Glass |
+| `native/cli/main.swift` | `kiosk` command line tool sharing the same store and renderer |
 
 ## The app model
 
@@ -125,3 +127,11 @@ bundle. Codesign failures are no longer suppressed, so `set -e` stops the script
 signing fails rather than silently producing an unsigned app. Rebuilding after an
 icon change may need `lsregister -f` and `killall Dock`, since macOS caches icons
 aggressively.
+
+## Command line
+
+`native/build-cli.sh` compiles `PlayStore.swift`, `IconRenderer.swift` and
+`cli/main.swift` into `build/kiosk`, a plain command line binary with no AppKit UI.
+It reuses the same searching, sanitising and rendering code as the app, so the two
+cannot drift: `search` prints or JSON-dumps results, and `get` writes one PNG using
+the same non-clobbering, atomic write the app uses.

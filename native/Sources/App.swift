@@ -118,18 +118,13 @@ final class IconModel {
         loading = false
     }
 
-    struct Icon {
-        let data: Data
-        let pixels: Int
-    }
-
     @ObservationIgnored private lazy var clipboardTempDirectory: URL = {
         let dir = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }()
 
-    func png(for app: PlayApp) async throws -> Icon {
+    func png(for app: PlayApp) async throws -> RenderedIcon {
         let data = try await store.iconData(app, size: size)
         return try await IconRenderer.render(data, size: size, upscale: upscale)
     }
@@ -182,48 +177,5 @@ final class IconModel {
         panel.canCreateDirectories = true
         panel.prompt = "Save icons here"
         if panel.runModal() == .OK, let url = panel.url { saveDirectory = url }
-    }
-}
-
-enum IconError: Error, LocalizedError {
-    case notAnImage
-
-    var errorDescription: String? {
-        switch self {
-        case .notAnImage:
-            return "The downloaded data isn't a valid image."
-        }
-    }
-}
-
-nonisolated enum IconRenderer {
-    static func render(_ data: Data, size: Int, upscale: Bool) async throws -> IconModel.Icon {
-        guard let image = NSBitmapImageRep(data: data) else {
-            throw IconError.notAnImage
-        }
-        if upscale, image.pixelsWide < size, let scaled = resize(image, to: size) {
-            return IconModel.Icon(data: scaled, pixels: size)
-        }
-        guard let png = image.representation(using: .png, properties: [:]) else {
-            throw IconError.notAnImage
-        }
-        return IconModel.Icon(data: png, pixels: image.pixelsWide)
-    }
-
-    private static func resize(_ image: NSBitmapImageRep, to size: Int) -> Data? {
-        guard let target = NSBitmapImageRep(
-            bitmapDataPlanes: nil, pixelsWide: size, pixelsHigh: size,
-            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)
-        else { return nil }
-        target.size = NSSize(width: size, height: size)
-
-        NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: target)
-        NSGraphicsContext.current?.imageInterpolation = .high
-        image.draw(in: NSRect(x: 0, y: 0, width: size, height: size))
-        NSGraphicsContext.restoreGraphicsState()
-
-        return target.representation(using: .png, properties: [:])
     }
 }

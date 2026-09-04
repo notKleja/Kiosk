@@ -34,6 +34,19 @@ bundle, copies in the icon and ad-hoc signs it. There is no Xcode project to ope
 
 Icons land as `<bundle id>_<size>.png`, for example `com.spotify.music_512.png`.
 
+## Command line
+
+```bash
+./native/build-cli.sh
+./native/build/kiosk search spotify
+./native/build/kiosk get telegram --store appstore --size 1024 --out ~/Icons
+```
+
+`search` lists bundle ids, ratings and names (`--json` for machine-readable output);
+`get` downloads one icon as PNG, picking the first result or the one named with
+`--pkg`. Both accept `--store`, `--country`, `--size` and `--upscale`. Run
+`kiosk --help` for the full list.
+
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md) — how search, icon fetching, clipboard and
