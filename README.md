@@ -1,4 +1,4 @@
-# GPlay Icon
+# Kiosk
 
 A small native macOS app for grabbing app icons. Search the Google Play Store or
 the Apple App Store by app name, see results update as you type, then copy an icon
@@ -17,7 +17,7 @@ Built with SwiftUI and macOS 26's Liquid Glass, with no third-party dependencies
 
 ```bash
 ./native/build.sh
-open "native/build/GPlay Icon.app"
+open "native/build/Kiosk.app"
 ```
 
 The script compiles `native/Sources/*.swift` with `swiftc`, assembles an `.app`

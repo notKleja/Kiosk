@@ -3,9 +3,9 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 @main
-struct GPlayIconApp: App {
+struct KioskApp: App {
     var body: some Scene {
-        WindowGroup("GPlay Icon") {
+        WindowGroup("Kiosk") {
             ContentView()
                 .frame(minWidth: 420, idealWidth: 460, minHeight: 440, idealHeight: 600)
         }

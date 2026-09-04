@@ -77,7 +77,7 @@ The folder is picked with `NSOpenPanel`. The app is not sandboxed, so a chosen f
 keeps working after a restart without security-scoped bookmarks.
 
 Store, size, country and save folder are persisted in `UserDefaults` under the
-`com.kleja.gplayicon` domain and restored in `IconModel.init`.
+`com.kleja.kiosk` domain and restored in `IconModel.init`.
 
 ## Interface
 
@@ -91,7 +91,7 @@ Sizes are rendered with `Text(verbatim:)` so `1024px` is not localised into `1,0
 
 ## Build
 
-`native/build.sh` writes `Info.plist` (bundle id `com.kleja.gplayicon`, minimum system
+`native/build.sh` writes `Info.plist` (bundle id `com.kleja.kiosk`, minimum system
 version 26.0), compiles all sources with `swiftc -O -parse-as-library` targeting
 `arm64-apple-macos26.0`, copies `native/Resources/AppIcon.icns` in and ad-hoc signs the
 bundle. Rebuilding after an icon change may need `lsregister -f` and `killall Dock`,
